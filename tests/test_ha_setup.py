@@ -67,6 +67,8 @@ def test_restart_targets_configured_home_assistant(
             return 200, ["hermes_voice"] if restarted else []
         if url.endswith("/api/onboarding") or url.endswith("/api/config/config_entries/entry"):
             return 200, []
+        if method == "GET" and url.endswith("/api/config"):
+            return 200, {"version": "2026.10.4"}  # satisfies the minimum-version check
         if method == "GET" and url.endswith("/api/"):
             return 200, {}
         raise AssertionError(f"unexpected HTTP request {method} {url}")
@@ -83,3 +85,35 @@ def test_restart_targets_configured_home_assistant(
         ("POST", "https://ha.test/api/services/homeassistant/restart", "dummy-token")
     ]
     docker.assert_not_called()
+
+
+def test_ha_version_at_least() -> None:
+    script = Path(__file__).resolve().parents[1] / "skill/hermes-voice-setup/scripts/ha_setup.py"
+    spec = importlib.util.spec_from_file_location("ha_setup_version", script)
+    assert spec and spec.loader
+    setup = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(setup)
+
+    at_least = setup.ha_version_at_least
+    assert at_least("2026.10.0", setup.MIN_HA_VERSION)
+    assert at_least("2026.10.4", setup.MIN_HA_VERSION)
+    assert at_least("2027.1.0", setup.MIN_HA_VERSION)
+    # The whole point: 2026.9 sorts below 2026.10 (string compare would say otherwise).
+    assert not at_least("2026.9.2", setup.MIN_HA_VERSION)
+    assert not at_least("2026.9", setup.MIN_HA_VERSION)
+
+
+def test_manifest_declares_homeassistant_floor() -> None:
+    import json
+
+    script = Path(__file__).resolve().parents[1] / "skill/hermes-voice-setup/scripts/ha_setup.py"
+    spec = importlib.util.spec_from_file_location("ha_setup_floor", script)
+    assert spec and spec.loader
+    setup = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(setup)
+
+    manifest = json.loads(
+        (Path(__file__).resolve().parents[1] / "custom_components/hermes_voice/manifest.json").read_text()
+    )
+    # The manifest floor and the setup script's constant must agree.
+    assert manifest["homeassistant"] == setup.MIN_HA_VERSION == "2026.10.0"
