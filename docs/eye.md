@@ -97,7 +97,7 @@ curl -s -H "Authorization: Bearer $(cat eye_token.txt)" http://<echo-ip>:28940/s
 
 [`extras/eye`](../extras/eye) adds one tool, `look`, to a Hermes profile. Ask "What am I holding?" and
 Hermes takes a picture and answers from it. Measured through the Echo Show's Assist pipeline: "You're
-holding a pair of scissors with large, light turquoise handles." It took 5.8 s, about 1.1 s of that the
+holding a pair of scissors with large, light turquoise handles." It took 5.8 s, about 1.1 s of that for the
 camera. With the Echo muted, Hermes answered "I can't see anything because your Echo's mute button is on."
 
 ## Video mode
