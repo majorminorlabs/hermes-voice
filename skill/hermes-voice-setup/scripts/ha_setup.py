@@ -40,6 +40,22 @@ DEFAULT_COMPONENT = next(
     os.path.join(SKILL_DIR, "assets", "hermes_voice"),
 )
 DOMAIN = "hermes_voice"
+MIN_HA_VERSION = "2026.10.0"
+
+
+def ha_version_at_least(current: str, minimum: str) -> bool:
+    """True when ``current`` (e.g. '2026.9.2') is >= ``minimum`` (e.g. '2026.10.0')."""
+
+    def key(v: str) -> tuple[int, ...]:
+        parts: list[int] = []
+        for piece in v.strip().split("."):
+            digits = "".join(ch for ch in piece if ch.isdigit())
+            parts.append(int(digits) if digits else 0)
+        return tuple(parts)
+
+    ck, mk = key(current), key(minimum)
+    width = max(len(ck), len(mk))
+    return (ck + (0,) * (width - len(ck))) >= (mk + (0,) * (width - len(mk)))
 
 
 def local_health_url(base_url: str, env: dict[str, str]) -> str:
@@ -256,6 +272,16 @@ def main() -> None:
         token = relogin(ha, a.secrets_dir) if not a.token_file else None
         if not token or http("GET", ha + "/api/", token=token)[0] != 200:
             die("Home Assistant rejected the token")
+
+    # 2b. version floor
+    if token and not a.dry_run:
+        status, cfg = http("GET", ha + "/api/config", token=token)
+        ha_version = (cfg or {}).get("version") if status == 200 and isinstance(cfg, dict) else None
+        if not ha_version:
+            say("[warn] could not read the HA version (GET /api/config); continuing")
+        elif not ha_version_at_least(str(ha_version), MIN_HA_VERSION):
+            die(f"Home Assistant {ha_version} is too old: hermes_voice requires {MIN_HA_VERSION} "
+                "or newer (llm.ToolResult was added in 2026.10). Upgrade HA and re-run.")
 
     # 3. integration files
     status, handlers = http("GET", ha + "/api/config/config_entries/flow_handlers", token=token) if token else (0, [])
