@@ -51,13 +51,19 @@ hermes gateway restart
 Then say or type "turn on visual memory". Settings are in `plugins.entries.hermes-visual-memory.settings`
 (also on the plugin's page in the Desktop app); every key is listed in [plugin.yaml](plugin.yaml).
 
+Update the `hermes_voice` Home Assistant integration from this repository for screen images. The display
+feed accepts the screen origin automatically when Home Assistant is opened over HTTP on the feed host's IP
+at port 8123. For a hostname, a different port, or a separate Home Assistant host, set `display_origin` to
+the origin of the screen page, for example `http://homeassistant.local:8123`. Use the scheme, host, and
+port from the address, without a path or trailing slash. Restart the plugin after changing the setting.
+
 **What the plugin does on your computer** (disclosed for the catalog):
 
 - Nothing runs until the first visual memory tool call. That call starts, inside the Hermes process: a camera
   loop (one snapshot a second from Hermes Eye on your network, **only while visual memory is on**), a small
   API on 127.0.0.1 that the tools use (token-protected), housekeeping that deletes old pictures, and a
-  display feed on your network (port 28951) that answers only the Echo's own address and this computer, so
-  the Echo's screen can show the pictures. These threads stop when Hermes stops.
+  display feed on your network (port 28951) that checks both the client IP and the Home Assistant screen's
+  browser origin before serving events or pictures. These threads stop when Hermes stops.
 - Network calls: the camera on your network; the vision model, wherever Hermes routes the *Visual memory*
   task (a cloud provider if that's your vision model), or the local server you set. Nothing else, no
   telemetry.
@@ -200,6 +206,7 @@ hermes -p <profile> gateway restart
 
 The Echo's screen (the Hermes screen page, `custom_components/hermes_voice/screen`) connects by itself to
 `<this computer>:28951` and shows a "Visual memory on" chip and the pictures Hermes shows.
+If the screen uses a custom origin, set `display_origin` in the standalone TOML file as described above.
 
 ## Use
 

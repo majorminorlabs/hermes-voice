@@ -10,9 +10,11 @@ data_dir = "~/.local/share/hermes-visual-memory"
 
 # The API Hermes uses (this computer only) and the feed the Echo's screen reads. The feed admits only the
 # addresses in display_allow; empty means the Echo's own address (from eye_url) and this computer.
+# It also requires the screen origin. Leave display_origin empty for HTTP port 8123 on this computer's IP.
 api_port = 28950
 display_port = 28951
 display_allow = []
+display_origin = ""          # e.g. "http://homeassistant.local:8123" (scheme, host, port only)
 
 # Sampling: one picture a second; a scene counts as steady after this long without movement.
 sample_seconds = 1.0

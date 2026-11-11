@@ -63,11 +63,15 @@ config_schema:
   display_port:
     type: int
     default: 28951
-    description: "The feed the Echo's screen reads (answers only the Echo's address and this computer)"
+    description: "The feed the Echo's screen reads (restricted by client IP and screen origin)"
   display_allow:
     type: list
     default: []
     description: "Extra addresses allowed to read the display feed (default: the Echo from eye_url)"
+  display_origin:
+    type: str
+    default: ""
+    description: "Exact Home Assistant screen origin (default: HTTP port 8123 on the feed's local IP)"
   mirror_for_user:
     type: bool
     default: true

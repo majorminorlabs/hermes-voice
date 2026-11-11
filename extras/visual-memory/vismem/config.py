@@ -24,11 +24,11 @@ class Config:
     # The API Hermes uses: this computer only.
     api_host: str = "127.0.0.1"
     api_port: int = 28950
-    # The feed the Echo's screen reads (evidence pictures, the "memory on" chip). Only the addresses in
-    # display_allow may connect; empty means the Echo's own address (from eye_url) and this computer.
+    # The feed requires both an allowed client IP and the Home Assistant screen's browser origin.
     display_host: str = "0.0.0.0"
     display_port: int = 28951
     display_allow: list[str] = field(default_factory=list)
+    display_origin: str = ""  # empty: HTTP port 8123 on the local address that received the request
     # The camera faces the user, so its left is the user's right. Positions are said, and pictures shown,
     # as the user sees them (mirrored, like the video-mode window).
     mirror_for_user: bool = True
@@ -148,6 +148,28 @@ class Config:
     def allowed_display_clients(self) -> set[str]:
         allow = set(self.display_allow) or {urlparse(self.eye_url).hostname or ""}
         return allow | {"127.0.0.1", "::1"}
+
+    def validate_display_origin(self) -> None:
+        origin = self.display_origin
+        if origin == "":
+            return
+        message = "display_origin must be the screen's HTTP(S) origin, e.g. http://homeassistant.local:8123"
+        if not isinstance(origin, str) or any(ord(c) < 33 or ord(c) >= 127 for c in origin):
+            raise ValueError(message)
+        try:
+            url = urlparse(origin)
+            port = url.port
+        except ValueError as err:
+            raise ValueError(message) from err
+        if (
+            url.scheme not in ("http", "https")
+            or not url.hostname
+            or url.username is not None
+            or "*" in url.netloc
+            or origin != f"{url.scheme}://{url.netloc}"
+            or port == 0
+        ):
+            raise ValueError(message)
 
 
 def load(path: Path | None = None) -> Config:

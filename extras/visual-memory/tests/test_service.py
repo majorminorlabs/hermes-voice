@@ -16,6 +16,8 @@ from vismem.service import Service
 
 from .scenes import BLACK_BOX, DESK, FakeVision, draw, shot
 
+SCREEN_ORIGIN = "http://127.0.0.1:8123"
+
 
 class Camera:
     def __init__(self) -> None:
@@ -64,8 +66,8 @@ def svc(tmp_path: Path):
     t.join(3)
 
 
-def req(s: Service, path: str, body: dict | None = None, token: str | None = None, port: int | None = None):
-    url = f"http://127.0.0.1:{port or s.cfg.api_port}{path}"
+def req(s: Service, path: str, body: dict | None = None, token: str | None = None):
+    url = f"http://127.0.0.1:{s.cfg.api_port}{path}"
     r = urllib.request.Request(
         url,
         data=json.dumps(body).encode() if body is not None else None,
@@ -73,6 +75,12 @@ def req(s: Service, path: str, body: dict | None = None, token: str | None = Non
     )
     with urllib.request.urlopen(r, timeout=10) as resp:
         return resp.status, resp.read()
+
+
+def display_request(s: Service, path: str, origin: str | None = SCREEN_ORIGIN):
+    url = f"http://127.0.0.1:{s.cfg.display_port}{path}"
+    req = urllib.request.Request(url, headers={"Origin": origin} if origin is not None else {})
+    return urllib.request.urlopen(req, timeout=20)
 
 
 def wait_for(cond, timeout: float = 10.0) -> None:
@@ -98,7 +106,8 @@ def test_session_observe_compare_show(svc) -> None:
     events: list[dict] = []
 
     def listen() -> None:
-        with urllib.request.urlopen(f"http://127.0.0.1:{s.cfg.display_port}/display/events", timeout=20) as r:
+        with display_request(s, "/display/events") as r:
+            assert r.headers["Access-Control-Allow-Origin"] == SCREEN_ORIGIN
             for line in r:
                 if line.startswith(b"data: "):
                     events.append(json.loads(line[6:]))
@@ -118,10 +127,11 @@ def test_session_observe_compare_show(svc) -> None:
     assert shown["shown"] and shown["listeners"] == 1
     wait_for(lambda: any(e["type"] == "vismem_show" and e["kind"] == "comparison" for e in events))
     key = [e["key"] for e in events if e["type"] == "vismem_show"][-1]  # (the first look showed one too)
-    code, img = req(s, f"/display/image/{key}.jpg", port=s.cfg.display_port)
-    assert code == 200 and img[:2] == b"\xff\xd8"
+    with display_request(s, f"/display/image/{key}.jpg") as resp:
+        assert resp.headers["Access-Control-Allow-Origin"] == SCREEN_ORIGIN
+        assert resp.status == 200 and resp.read()[:2] == b"\xff\xd8"
     with pytest.raises(urllib.error.HTTPError):
-        req(s, "/display/image/guess.jpg", port=s.cfg.display_port)
+        display_request(s, "/display/image/guess.jpg")
     code, img = req(s, f"/evidence/comparison/{s.mem.baseline_id}.jpg")
     assert img[:2] == b"\xff\xd8"
     req(s, "/session", {"on": False})
@@ -130,6 +140,32 @@ def test_session_observe_compare_show(svc) -> None:
     assert cam.n == n, "off means no pictures are taken"
     usage = json.loads(req(s, "/usage")[1])
     assert usage["calls"] == 2 and usage["input_tokens"] == 2000
+
+
+def test_display_rejects_other_origins_even_from_loopback(svc) -> None:
+    s, _, _ = svc
+    s.display.show(b"test image", "test caption", "scene")
+    image = f"/display/image/{s.display.current['key']}.jpg"
+    for path in ("/display/events", image):
+        for origin in (None, "null", "https://other.example", "http://127.0.0.1:8000"):
+            with pytest.raises(urllib.error.HTTPError) as err:
+                display_request(s, path, origin)
+            assert err.value.code == 403
+            assert "Access-Control-Allow-Origin" not in err.value.headers
+    assert not s.display.clients
+
+
+def test_display_custom_origin_replaces_default(svc) -> None:
+    s, _, _ = svc
+    s.cfg.display_origin = "http://homeassistant.local:8123"
+    s.display.show(b"test image", "test caption", "scene")
+    image = f"/display/image/{s.display.current['key']}.jpg"
+    with pytest.raises(urllib.error.HTTPError) as err:
+        display_request(s, image)
+    assert err.value.code == 403
+    with display_request(s, image, s.cfg.display_origin) as resp:
+        assert resp.headers["Access-Control-Allow-Origin"] == s.cfg.display_origin
+        assert resp.read() == b"test image"
 
 
 def test_display_refuses_other_addresses(tmp_path: Path) -> None:

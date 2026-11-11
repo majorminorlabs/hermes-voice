@@ -40,6 +40,7 @@ SETTINGS = (
     "api_port",
     "display_port",
     "display_allow",
+    "display_origin",
     "mirror_for_user",
     "quick_wait",
     "look_when_settled",
@@ -82,6 +83,10 @@ class Runtime:
                 "Visual memory needs the camera's address: set eye_url to Hermes Eye on the Echo Show, e.g. "
                 "hermes config set plugins.entries.hermes-visual-memory.settings.eye_url http://<echo-ip>:28940"
             )
+        try:
+            cfg.validate_display_origin()
+        except ValueError as err:
+            raise SetupError(str(err)) from err
         return cfg
 
     # Start on first use

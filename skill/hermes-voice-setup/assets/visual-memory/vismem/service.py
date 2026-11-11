@@ -1,5 +1,5 @@
 """The running service: the camera loop, the API Hermes uses (this computer only, with a token), and the
-display feed the Echo's screen reads (only the Echo's address may connect).
+display feed the Echo's screen reads (restricted by client address and browser origin).
 """
 
 from __future__ import annotations
@@ -88,6 +88,7 @@ def make_vision(cfg: Config, quick: bool) -> Any:
 
 class Service:
     def __init__(self, cfg: Config, vision: Any = None, camera: Any = None, quick_vision: Any = None) -> None:
+        cfg.validate_display_origin()
         self.cfg = cfg
         self.store = Store(cfg.data_path)
         self.vision = vision or make_vision(cfg, quick=False)
@@ -287,17 +288,30 @@ def _handler(svc: Service, display: bool) -> type[BaseHTTPRequestHandler]:
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
-            if display:
-                self.send_header("Access-Control-Allow-Origin", "*")
+            if display and code == 200:
+                self._send_display_headers()
             self.end_headers()
             self.wfile.write(body)
 
         def _json(self, data: Any, code: int = 200) -> None:
             self._send(code, json.dumps(data, default=str).encode())
 
+        def _send_display_headers(self) -> None:
+            self.send_header("Access-Control-Allow-Origin", self.headers["Origin"])
+            self.send_header("Vary", "Origin")
+
         def _allowed(self) -> bool:
             if display:
-                return self.client_address[0] in svc.cfg.allowed_display_clients
+                if self.client_address[0] not in svc.cfg.allowed_display_clients:
+                    return False
+                origin = self.headers.get("Origin", "")
+                if svc.cfg.display_origin:
+                    return origin == svc.cfg.display_origin
+                # Use the socket's address instead of the client-supplied Host header.
+                local_ip = self.connection.getsockname()[0]
+                return origin == f"http://{local_ip}:8123" or (
+                    local_ip == "127.0.0.1" and origin == "http://localhost:8123"
+                )
             if self.path.startswith("/health"):
                 return True
             auth = self.headers.get("Authorization", "")
@@ -407,7 +421,7 @@ def _handler(svc: Service, display: bool) -> type[BaseHTTPRequestHandler]:
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-store")
-            self.send_header("Access-Control-Allow-Origin", "*")
+            self._send_display_headers()
             self.end_headers()
             with d.lock:
                 d.clients.append(q)

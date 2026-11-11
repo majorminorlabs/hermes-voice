@@ -417,7 +417,7 @@
   // ------------------------------------------------------------------------------- vismem --
   // Hermes Visual Memory (extras/visual-memory): a chip while it is watching, and the pictures Hermes shows
   // (before/after, or where something was last seen). The feed runs on the computer that serves this page;
-  // it lets only the Echo's own address in, so other screens simply never connect.
+  // it checks the client address and the browser origin for events and images.
   const VISMEM = params.get("vismem") || location.protocol + "//" + location.hostname + ":28951";
   const VM_SHOW_MS = 45000;
   let vmTimer = null;
@@ -431,6 +431,7 @@
   function vmShow(ev) {
     const img = document.createElement("img"); // made only when there is a picture to show
     img.alt = "What the camera saw";
+    img.crossOrigin = "anonymous"; // send the screen's Origin with the image request
     img.src = VISMEM + "/display/image/" + ev.key + ".jpg";
     $("vm-pic").replaceChildren(img);
     $("vm-caption").textContent = ev.caption || "";
