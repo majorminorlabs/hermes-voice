@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Spoken replies keep snake_case identifiers (`tool_call_id`, `file_name_here`). A single underscore is
+  emphasis only at a word boundary, so text-to-speech no longer collapses a file name into one word.
+- A streamed turn that runs a tool and then says nothing speaks the fallback after the working phrase,
+  instead of stopping on "One moment."
 - Hermes Visual Memory is now also a native Hermes plugin (`extras/visual-memory`, `plugin.yaml`): the seven
   tools registered with Hermes, the service started inside Hermes on the first tool call, memory in Hermes's
   plugin data directory, the camera token read through Hermes. Vision goes through Hermes's own model routing

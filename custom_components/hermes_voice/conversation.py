@@ -299,7 +299,10 @@ class HermesConversationEntity(conversation.ConversationEntity):
                     }
                 elif isinstance(event, ToolEvent) and event.tool_call_id in open_tools:
                     open_tools.discard(event.tool_call_id)
-                    role = "tool_result"
+                    # This assistant message is finished. Text said before the tool, including the
+                    # working phrase, is not the answer that follows it. Leaving answer_text set made
+                    # a tool with no reply skip the fallback and stop on "One moment."
+                    role, answer_text = "tool_result", False
                     yield {
                         "role": "tool_result",
                         "tool_call_id": event.tool_call_id,

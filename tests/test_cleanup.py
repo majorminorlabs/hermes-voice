@@ -30,6 +30,10 @@ from custom_components.hermes_voice.cleanup import clean_for_voice
         ("<b>html</b> tags", "html tags"),
         ("Line one\n\n---\n\nLine two", "Line one. Line two"),
         ("Ends with question?\nNext", "Ends with question? Next"),
+        ("The tool_call_id is file_name_here.", "The tool_call_id is file_name_here."),
+        ("Set X_Hermes_Session and a_b_c_d.", "Set X_Hermes_Session and a_b_c_d."),
+        ("say _italic_ now", "say italic now"),
+        ("use __init__ here", "use init here"),
     ],
 )
 def test_clean_for_voice(raw: str, expected: str) -> None:

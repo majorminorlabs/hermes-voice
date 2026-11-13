@@ -14,7 +14,15 @@ _HEADING = re.compile(r"^\s{0,3}#{1,6}\s*")
 _QUOTE = re.compile(r"^\s{0,3}>\s?")
 _BULLET = re.compile(r"^\s*(?:[-*+•]|\d+[.)])\s+")
 _HR = re.compile(r"^\s*([-*_])(\s*\1){2,}\s*$")
-_EMPHASIS = re.compile(r"(\*\*|__|\*|_|~~)(?=\S)(.+?)(?<=\S)\1")
+# A single underscore is emphasis only at a word boundary. Inside an identifier
+# (`tool_call_id`, `file_name_here`) it is not markdown; stripping it speaks
+# "toolcallid", which a TTS engine cannot recover. `__bold__` still counts.
+_EMPHASIS = re.compile(
+    r"(\*\*|~~)(?=\S)(.+?)(?<=\S)\1"
+    r"|(__)(?=\S)(.+?)(?<=\S)__"
+    r"|(?<![\w*])\*(?=\S)(.+?)(?<=\S)\*(?![\w*])"
+    r"|(?<![\w_])_(?=\S)(.+?)(?<=\S)_(?![\w_])"
+)
 _HTML_TAG = re.compile(r"</?[A-Za-z][^>]*>")
 _EMOJI = re.compile(
     "["
@@ -26,6 +34,11 @@ _EMOJI = re.compile(
     "]+"
 )
 _SPACES = re.compile("[ \t\u00a0]+")
+
+
+def _strip_emphasis(match: re.Match[str]) -> str:
+    """Inner text of one emphasis match. The alternatives capture it in different groups."""
+    return next(g for g in (match.group(2), match.group(4), match.group(5), match.group(6)) if g is not None)
 
 
 def _table_row(line: str) -> str | None:
@@ -78,7 +91,7 @@ def clean_for_voice(text: str, unsay_name: bool = True) -> str:
     text = " ".join(out)
 
     for _ in range(2):  # nested emphasis
-        text = _EMPHASIS.sub(lambda m: m.group(2), text)
+        text = _EMPHASIS.sub(_strip_emphasis, text)
     text = _EMOJI.sub("", text)
     text = text.replace("|", " ")
     text = _SPACES.sub(" ", text)

@@ -200,6 +200,21 @@ async def test_stream_errors_speak_fallback(
     assert "boom" not in _assistant_text(hass, result)
 
 
+async def test_tool_then_nothing_follows_working_phrase(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A tool with no following text keeps the working phrase and still speaks the fallback."""
+    await _setup(hass, aioclient_mock)
+    aioclient_mock.post(
+        CHAT,
+        text=stream(tool("c1", "running"), tool("c1", "completed"), chunk(finish="stop")),
+        headers=SSE,
+    )
+    result = await _say(hass)
+    assert _speech(result) == DEFAULT_FALLBACK_MESSAGE
+    assert _assistant_text(hass, result) == f"{DEFAULT_WORKING_PHRASE} {DEFAULT_FALLBACK_MESSAGE}"
+
+
 async def test_error_after_text_keeps_text(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
     """What was already said stays; the fallback follows."""
     await _setup(hass, aioclient_mock)
